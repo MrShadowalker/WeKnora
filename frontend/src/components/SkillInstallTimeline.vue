@@ -59,6 +59,7 @@ import { useChatStreamHandler } from '@/composables/useChatStreamHandler'
 import { getMessageList } from '@/api/chat'
 import { configSkillTranscriptUrl, getConfigSkillGuidance, steerConfigSkill, reinstallConfigSkill, type SkillInstallGuidanceState } from '@/api/system'
 import { getApiBaseUrl } from '@/utils/api-base'
+import { ONEHUB_GATEWAY_MODE, ensureOneHubSession, gatewayApiPath, getOneHubCsrf } from '@/config/onehubGateway'
 import { generateRandomString } from '@/utils/index'
 import { makeSteerClientId } from '@/utils/steerId'
 import SandboxCommandProgress from './SandboxCommandProgress.vue'
@@ -210,9 +211,9 @@ function stop() {
 // reports whether it ever produced anything: a 404 means the event log has
 // expired and the durable history is the only remaining source.
 async function follow(run: number): Promise<boolean> {
-  const url = `${getApiBaseUrl()}${configSkillTranscriptUrl(props.configId, props.skillId)}`
-  const token = localStorage.getItem('weknora_token')
-  const tenantId = localStorage.getItem('weknora_selected_tenant_id')
+  const url = gatewayApiPath(`${getApiBaseUrl()}${configSkillTranscriptUrl(props.configId, props.skillId)}`)
+  const token = ONEHUB_GATEWAY_MODE ? '' : localStorage.getItem('weknora_token')
+  const tenantId = ONEHUB_GATEWAY_MODE ? '' : localStorage.getItem('weknora_selected_tenant_id')
   const ac = new AbortController()
   controller = ac
   if (run !== openRun) {
@@ -221,10 +222,12 @@ async function follow(run: number): Promise<boolean> {
   }
   let served = false
 
+  await ensureOneHubSession()
   await fetchEventSource(url, {
     method: 'GET',
     headers: {
-      Authorization: token ? `Bearer ${token}` : '',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(ONEHUB_GATEWAY_MODE ? { 'X-OneHub-CSRF': getOneHubCsrf() } : {}),
       'Accept-Language': i18n.global.locale?.value || localStorage.getItem('locale') || 'zh-CN',
       'X-Request-ID': generateRandomString(12),
       ...(tenantId ? { 'X-Tenant-ID': tenantId } : {}),

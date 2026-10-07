@@ -7,6 +7,7 @@ import {
 import i18n from '@/i18n'
 import { generateRandomString } from '@/utils'
 import { getApiBaseUrl } from '@/utils/api-base'
+import { ONEHUB_GATEWAY_MODE, ensureOneHubSession, gatewayApiPath, getOneHubCsrf } from '@/config/onehubGateway'
 import {
   installRunFinished,
   liveInstallPercent,
@@ -84,14 +85,15 @@ export function useConfigSkillInstallProgress(options?: {
     const isCurrent = () => abortByKey.get(key) === controller
     const stopCurrent = () => { if (isCurrent()) stop(key) }
 
-    const token = localStorage.getItem('weknora_token')
-    const tenantId = localStorage.getItem('weknora_selected_tenant_id')
-    const url = `${getApiBaseUrl()}${configSkillInstallEventsUrl(configId, skillId)}`
+    const token = ONEHUB_GATEWAY_MODE ? '' : localStorage.getItem('weknora_token')
+    const tenantId = ONEHUB_GATEWAY_MODE ? '' : localStorage.getItem('weknora_selected_tenant_id')
+    const url = gatewayApiPath(`${getApiBaseUrl()}${configSkillInstallEventsUrl(configId, skillId)}`)
 
     void fetchEventSource(url, {
       method: 'GET',
       headers: {
-        Authorization: token ? `Bearer ${token}` : '',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(ONEHUB_GATEWAY_MODE ? { 'X-OneHub-CSRF': getOneHubCsrf() } : {}),
         'Accept-Language': i18n.global.locale?.value || localStorage.getItem('locale') || 'zh-CN',
         'X-Request-ID': generateRandomString(12),
         ...(tenantId ? { 'X-Tenant-ID': tenantId } : {}),

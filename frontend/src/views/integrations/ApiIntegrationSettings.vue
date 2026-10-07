@@ -1652,7 +1652,8 @@ async function runPlayground() {
   try {
     await ensurePlaygroundSignedToken()
     const headers = buildPlaygroundHeaders(false).sessionHeaders
-    const sessionResp = await fetch(`${apiBaseUrl.value}/sessions`, {
+    const { gatewayFetch } = await import('@/utils/gatewayRequest')
+    const sessionResp = await gatewayFetch(`${apiBaseUrl.value}/sessions`, {
       method: 'POST',
       headers,
       body: '{}',
@@ -1678,7 +1679,7 @@ async function runPlayground() {
     }
 
     playground.chat_status = 'running'
-    const chatResp = await fetch(`${apiBaseUrl.value}/agent-chat/${encodeURIComponent(sessionID)}`, {
+    const chatResp = await gatewayFetch(`${apiBaseUrl.value}/agent-chat/${encodeURIComponent(sessionID)}`, {
       method: 'POST',
       headers: buildPlaygroundHeaders(false).chatHeaders,
       body: JSON.stringify({

@@ -231,7 +231,8 @@ async function download(): Promise<void> {
   const img = current.value
   if (!img || !src.value) return
   try {
-    const blob = await (await fetch(src.value)).blob()
+    const { gatewayFetch } = await import('@/utils/gatewayRequest')
+    const blob = await (await gatewayFetch(src.value)).blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

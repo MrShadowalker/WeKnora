@@ -218,7 +218,8 @@ async function loadChunk(version: number) {
           const request = buildProtectedFileRequest(info[0].url || '', resolveProtectedFileAccess({ mode: 'knowledgeBase', kbId: props.target.knowledgeBaseId || '' }))
           if (request) {
             try {
-              const response = await fetch(request.url, { headers: request.headers, credentials: 'include' })
+              const { gatewayFetch } = await import('@/utils/gatewayRequest')
+              const response = await gatewayFetch(request.url, { headers: request.headers, credentials: 'include' })
               if (response.ok) {
                 const hash = await sourceImageDigest(await response.arrayBuffer())
                 if (version !== loadVersion) return

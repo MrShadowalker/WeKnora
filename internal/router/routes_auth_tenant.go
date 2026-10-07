@@ -229,6 +229,9 @@ func RegisterAuthRoutes(r *gin.RouterGroup, handler *handler.AuthHandler, g *rba
 	// for any valid API key. Chat clients / MCP call it to discover "who am I";
 	// leaving it default-deny was why scoped keys got a 403 here.
 	g.apiKeyRoute(r, http.MethodGet, "/auth/me", apiKeyAny(), handler.GetCurrentUser)
+	// Non-secret scope/principal projection used by a trusted same-origin
+	// gateway to verify its configured key is restricted to the mapped project.
+	g.apiKeyRoute(r, http.MethodGet, "/auth/me/gateway-context", apiKeyAny(), handler.GetGatewayContext)
 	r.PUT("/auth/me/preferences", handler.UpdateMyPreferences)
 	r.POST("/auth/change-password", handler.ChangePassword)
 }

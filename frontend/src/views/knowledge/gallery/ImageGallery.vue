@@ -114,7 +114,8 @@ async function fetchBlobUrl(rawUrl: string): Promise<string> {
   const req = galleryImageRequest(rawUrl, props.knowledgeBaseId)
   if (!req) return rawUrl
   try {
-    const resp = await fetch(req.url, { headers: req.headers })
+    const { gatewayFetch } = await import('@/utils/gatewayRequest')
+    const resp = await gatewayFetch(req.url, { headers: req.headers })
     if (!resp.ok) return rawUrl
     const objectUrl = URL.createObjectURL(await resp.blob())
     blobByRawUrl.set(rawUrl, objectUrl)

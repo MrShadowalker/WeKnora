@@ -667,7 +667,8 @@ export async function hydrateProtectedFileImages(
         for (let attempt = 0; ; attempt++) {
           const generation = protectedFileCacheState.retryGeneration;
           try {
-            const resp = await fetch(requestURL, {
+            const { gatewayFetch } = await import('@/utils/gatewayRequest')
+            const resp = await gatewayFetch(requestURL, {
               method: 'GET',
               headers,
               credentials: 'include',

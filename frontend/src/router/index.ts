@@ -259,9 +259,7 @@ function persistLoginResponse(authStore: ReturnType<typeof useAuthStore>, respon
 
 async function hydrateSessionFromToken(authStore: ReturnType<typeof useAuthStore>) {
   if (ONEHUB_GATEWAY_MODE) {
-    const ok = await authStore.refreshFromAuthMe()
-    if (ok) authStore.setGatewaySessionActive(true)
-    return ok
+    return authStore.refreshFromAuthMe()
   }
   const token = localStorage.getItem('weknora_token')
   if (!token) return false

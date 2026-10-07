@@ -672,6 +672,36 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 	})
 }
 
+// GetGatewayContext exposes only non-secret authorization context for a
+// trusted same-origin gateway. It intentionally does not return the API key,
+// user profile, memberships, or tenant settings. The gateway uses this
+// endpoint to fail closed when a configured key is full-access or its KB
+// allow-list differs from the configured project mapping.
+func (h *AuthHandler) GetGatewayContext(c *gin.Context) {
+	ctx := c.Request.Context()
+	scope, ok := types.TenantAPIKeyScopeFromContext(ctx)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "API key context required"})
+		return
+	}
+	principal, ok := types.PrincipalFromContext(ctx)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "principal context required"})
+		return
+	}
+	tenantID, _ := types.TenantIDFromContext(ctx)
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		"tenant_id": tenantID,
+		"scope": gin.H{
+			"full_access":        scope.FullAccess,
+			"scope_type":         scope.ScopeType,
+			"knowledge_base_ids": scope.KnowledgeBaseIDs,
+			"capabilities":       scope.Capabilities,
+		},
+		"principal": gin.H{"type": principal.Type, "id": principal.ID},
+	}})
+}
+
 // updateMyPreferencesRequest is the body for PUT /auth/me/preferences.
 // Fields are pointers so the handler can distinguish "key not present"
 // (preserve existing value) from "explicit false". See

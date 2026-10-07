@@ -12,7 +12,7 @@ import { useChatResourcesStore } from '@/stores/chatResources'
 import { useEditorResourcesStore } from '@/stores/editorResources'
 import { useOrganizationStore } from '@/stores/organization'
 import { createSequencedRefresh } from '@/stores/sequencedRefresh'
-import { ONEHUB_GATEWAY_MODE } from '@/config/onehubGateway'
+import { ONEHUB_GATEWAY_MODE, resetOneHubSession } from '@/config/onehubGateway'
 
 /** 登出时丢弃 Pinia 内的空间级资源缓存，避免 SPA 重登复用上一账号数据。 */
 function clearSessionResourceCaches() {
@@ -360,7 +360,21 @@ export const useAuthStore = defineStore('auth', () => {
     }
   })
 
-  const refreshFromAuthMe = (): Promise<boolean> => authMeRequest.refresh()
+  const setGatewayIdentity = (value: any) => {
+    const response = value?.data ? value : { success: true, data: value }
+    if (!response?.data?.user) { gatewaySessionActive.value = false; return }
+    applyAuthMeResponse(response)
+  }
+
+  const refreshFromAuthMe = (): Promise<boolean> => {
+    if (ONEHUB_GATEWAY_MODE) {
+      return import('@/config/onehubGateway').then(({ ensureOneHubSession }) => ensureOneHubSession(true)).then(ok => ok ? authMeRequest.refresh() : false).then(ok => {
+        gatewaySessionActive.value = ok
+        return ok
+      })
+    }
+    return authMeRequest.refresh()
+  }
 
   /** 会话内已校准过就直接返回，否则复用飞行中的 /auth/me，没有就拉一次。 */
   const ensureAuthMe = (): Promise<boolean> => {
@@ -404,6 +418,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     setAutoAcceptInvitation(response.data?.capabilities?.auto_accept_invitation === true)
+
+    if (ONEHUB_GATEWAY_MODE) gatewaySessionActive.value = true
 
     authMeSynced = true
     return true
@@ -460,6 +476,7 @@ export const useAuthStore = defineStore('auth', () => {
     canCreateTenant.value = false
     autoAcceptInvitation.value = false
     gatewaySessionActive.value = false
+    if (ONEHUB_GATEWAY_MODE) resetOneHubSession()
     authMeSynced = false
     // 飞行中的 /auth/me 作废：登出之后才返回的响应不能再 setUser / setTenant。
     authMeRequest.invalidate()
@@ -614,6 +631,7 @@ export const useAuthStore = defineStore('auth', () => {
     setTenant,
     setToken,
     setGatewaySessionActive: (value: boolean) => { gatewaySessionActive.value = value },
+    setGatewayIdentity,
     setRefreshToken,
     setKnowledgeBases,
     setCurrentKnowledgeBase,

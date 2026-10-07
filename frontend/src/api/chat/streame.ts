@@ -3,6 +3,7 @@ import { ref, onUnmounted } from 'vue';
 import { generateRandomString } from '@/utils/index';
 import i18n from '@/i18n';
 import { getApiBaseUrl } from '@/utils/api-base';
+import { ONEHUB_GATEWAY_MODE, ensureOneHubSession, gatewayApiPath, getOneHubCsrf } from '@/config/onehubGateway';
 import {
   sanitizeStreamRequestBody,
   type StreamRequestMeta,
@@ -53,8 +54,8 @@ export function useStream() {
     const apiUrl = getApiBaseUrl();
     
     const embedToken = params.embed_token;
-    const token = embedToken || localStorage.getItem('weknora_token');
-    if (!token) {
+    const token = embedToken || (ONEHUB_GATEWAY_MODE ? '' : localStorage.getItem('weknora_token'));
+    if (!token && !ONEHUB_GATEWAY_MODE) {
       error.value = i18n.global.t('error.tokenNotFound');
       stopStream();
       return;
@@ -80,6 +81,7 @@ export function useStream() {
     let firstAnswerLogged = false;
 
     try {
+      if (ONEHUB_GATEWAY_MODE) await ensureOneHubSession();
       let url =
         params.method == "POST"
           ? `${apiUrl}${params.url}/${params.session_id}`
@@ -167,11 +169,14 @@ export function useStream() {
       // Wrapped so an expired access token can be refreshed and the request
       // replayed once. Nothing has been streamed to the UI yet when the
       // handshake 401s, so the replay is invisible to the user.
-      const runStream = (authToken: string) => fetchEventSource(url, {
+      const streamUrl = gatewayApiPath(url)
+      const runStream = (authToken: string) => fetchEventSource(streamUrl, {
         method: params.method,
         headers: {
           "Content-Type": "application/json",
-          "Authorization": embedToken ? `Embed ${embedToken}` : `Bearer ${authToken}`,
+          ...(embedToken ? { "Authorization": `Embed ${embedToken}` } : {}),
+          ...(!embedToken && !ONEHUB_GATEWAY_MODE ? { "Authorization": `Bearer ${authToken}` } : {}),
+          ...(ONEHUB_GATEWAY_MODE ? { "X-OneHub-CSRF": getOneHubCsrf() } : {}),
           "Accept-Language": i18n.global.locale?.value || localStorage.getItem('locale') || 'zh-CN',
           "X-Request-ID": requestID,
           ...(!embedToken && tenantIdHeader ? { "X-Tenant-ID": tenantIdHeader } : {}),
@@ -222,8 +227,8 @@ export function useStream() {
 
       await runStreamWithAuthRetry({
         run: runStream,
-        initialToken: token,
-        isEmbed: Boolean(embedToken),
+        initialToken: token || '',
+        isEmbed: Boolean(embedToken || ONEHUB_GATEWAY_MODE),
         isCurrent: () => myGeneration === streamGeneration && !streamAbort.signal.aborted,
         refreshAccessToken: () => refreshAccessTokenShared({
           messages: {

@@ -10,7 +10,7 @@ import {
   isEmbedPage,
   refreshAccessTokenShared,
 } from './authRefresh';
-import { ONEHUB_GATEWAY_MODE } from '@/config/onehubGateway'
+import { ONEHUB_GATEWAY_MODE, ensureOneHubSession, gatewayApiPath, getOneHubCsrf } from '@/config/onehubGateway'
 
 export { forceReloginRedirect, refreshAccessTokenShared };
 
@@ -72,7 +72,19 @@ export function getCurrentLanguage(): string {
 
 
 instance.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    if (ONEHUB_GATEWAY_MODE) {
+      await ensureOneHubSession()
+      config.withCredentials = true
+      delete config.headers.Authorization
+      delete config.headers.authorization
+      delete config.headers['X-API-Key']
+      delete config.headers['X-Tenant-ID']
+      if (!['get', 'head', 'options'].includes((config.method || 'get').toLowerCase())) {
+        const csrf = getOneHubCsrf()
+        if (csrf) config.headers['X-OneHub-CSRF'] = csrf
+      }
+    }
     const existingAuth = config.headers?.Authorization ?? config.headers?.authorization;
     const isEmbedAuth = typeof existingAuth === 'string' && existingAuth.startsWith('Embed ');
     const isEmbedPath = typeof config.url === 'string' && config.url.includes('/api/v1/embed/');
@@ -178,7 +190,7 @@ instance.interceptors.response.use(
     }
 
     // 如果是401错误且不是刷新token的请求，尝试刷新token
-    if (error.response.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/refresh')) {
+    if (!ONEHUB_GATEWAY_MODE && error.response.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/refresh')) {
       originalRequest._retry = true;
       try {
         const token = await refreshAccessTokenShared({
